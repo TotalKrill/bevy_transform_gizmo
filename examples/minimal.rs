@@ -1,6 +1,8 @@
 use bevy::{prelude::*, window::PresentMode::AutoNoVsync};
 use bevy_mod_picking::DefaultPickingPlugins;
-use bevy_transform_gizmo::TransformGizmoPlugin;
+use bevy_transform_gizmo::{
+    GizmoAxisMode, GizmoAxisModeValue, GizmoSettings, TransformGizmoPlugin,
+};
 
 fn main() {
     App::new()
@@ -36,7 +38,7 @@ fn setup(
             ..Default::default()
         },
         bevy_mod_picking::PickableBundle::default(),
-        bevy_transform_gizmo::GizmoTransformable,
+        bevy_transform_gizmo::GizmoTransformable::default(),
     ));
     // cube
     commands.spawn((
@@ -47,7 +49,7 @@ fn setup(
             ..Default::default()
         },
         bevy_mod_picking::PickableBundle::default(),
-        bevy_transform_gizmo::GizmoTransformable,
+        bevy_transform_gizmo::GizmoTransformable::default(),
     ));
     // light
     commands.spawn(PointLightBundle {
@@ -63,4 +65,13 @@ fn setup(
         bevy_mod_picking::PickingCameraBundle::default(),
         bevy_transform_gizmo::GizmoPickSource::default(),
     ));
+
+    commands.insert_resource(GizmoSettings {
+        alignment_rotation: Quat::default(),
+        allow_rotation: true,
+        allow_plane_translation: true,
+        axis_mode: GizmoAxisMode {
+            mode: GizmoAxisModeValue::XYZ,
+        },
+    });
 }

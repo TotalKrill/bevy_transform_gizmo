@@ -6,7 +6,7 @@ use bevy::{
 use bevy_mod_picking::{self, PickingBlocker, PickingCamera, Primitive3d, Selection};
 use bevy_mod_raycast::RaycastSystem;
 use gizmo_material::GizmoMaterial;
-use mesh::{RotationGizmo, ViewTranslateGizmo};
+use mesh::ViewTranslateGizmo;
 use normalization::*;
 
 mod gizmo_material;
@@ -55,12 +55,33 @@ pub struct GizmoTransformable;
 #[derive(Component, Default, Clone, Debug)]
 pub struct InternalGizmoCamera;
 
+#[derive(PartialEq, Clone, Copy, Debug)]
+pub enum GizmoAxisModeValue {
+    XYZ,
+    X,
+    Y,
+    Z,
+}
+
+impl Default for GizmoAxisModeValue {
+    fn default() -> Self {
+        GizmoAxisModeValue::XYZ
+    }
+}
+
+#[derive(PartialEq, Clone, Copy, Debug, Default)]
+pub struct GizmoAxisMode {
+    pub mode: GizmoAxisModeValue,
+}
+
 #[derive(Resource, Clone, Debug)]
 pub struct GizmoSettings {
     /// Rotation to apply to the gizmo when it is placed. Used to align the gizmo to a different
     /// coordinate system.
     pub alignment_rotation: Quat,
     pub allow_rotation: bool,
+    pub allow_plane_translation: bool,
+    pub axis_mode: GizmoAxisMode,
 }
 
 #[derive(Default, Debug, Clone)]
@@ -85,6 +106,8 @@ impl Plugin for TransformGizmoPlugin {
         app.insert_resource(GizmoSettings {
             alignment_rotation,
             allow_rotation: true,
+            allow_plane_translation: true,
+            axis_mode: GizmoAxisMode::default(),
         })
         .insert_resource(GizmoSystemsEnabled(true))
         .add_plugin(MaterialPlugin::<GizmoMaterial>::default())
@@ -503,16 +526,36 @@ fn propagate_gizmo_elements(
 
 fn update_gizmo_settings(
     plugin_settings: Res<GizmoSettings>,
-    mut interactions: Query<&mut TransformGizmoInteraction, Without<ViewTranslateGizmo>>,
-    mut rotations: Query<&mut Visibility, With<RotationGizmo>>,
+    mut interactions: Query<(
+        &mut TransformGizmoInteraction,
+        &mut Visibility,
+        Option<&ViewTranslateGizmo>,
+    )>,
 ) {
     if !plugin_settings.is_changed() {
         return;
     }
     let rotation = plugin_settings.alignment_rotation;
-    for mut interaction in interactions.iter_mut() {
+    for (mut interaction, mut visibility, option) in interactions.iter_mut() {
+        let axis_filter = match plugin_settings.axis_mode.mode {
+            GizmoAxisModeValue::XYZ => None,
+            GizmoAxisModeValue::X => Some(Vec3::X),
+            GizmoAxisModeValue::Y => Some(Vec3::Y),
+            GizmoAxisModeValue::Z => Some(Vec3::Z),
+        };
+
         if let Some(rotated_interaction) = match *interaction {
             TransformGizmoInteraction::TranslateAxis { original, axis: _ } => {
+                if let Some(filter) = axis_filter {
+                    if filter == original {
+                        visibility.is_visible = true;
+                    } else {
+                        visibility.is_visible = false;
+                    }
+                } else {
+                    visibility.is_visible = true;
+                }
+
                 Some(TransformGizmoInteraction::TranslateAxis {
                     original,
                     axis: rotation.mul_vec3(original),
@@ -521,29 +564,56 @@ fn update_gizmo_settings(
             TransformGizmoInteraction::TranslatePlane {
                 original,
                 normal: _,
-            } => Some(TransformGizmoInteraction::TranslatePlane {
-                original,
-                normal: rotation.mul_vec3(original),
-            }),
+            } => {
+                if let Some(filter) = axis_filter {
+                    if filter == original {
+                        visibility.is_visible = plugin_settings.allow_plane_translation;
+                    } else {
+                        visibility.is_visible = false;
+                    }
+                } else {
+                    visibility.is_visible = plugin_settings.allow_plane_translation;
+                }
+                Some(TransformGizmoInteraction::TranslatePlane {
+                    original,
+                    normal: rotation.mul_vec3(original),
+                })
+            }
             TransformGizmoInteraction::RotateAxis { original, axis: _ } => {
+                if let Some(filter) = axis_filter {
+                    if filter == original {
+                        visibility.is_visible = plugin_settings.allow_rotation;
+                    } else {
+                        visibility.is_visible = false;
+                    }
+                } else {
+                    visibility.is_visible = plugin_settings.allow_rotation;
+                }
                 Some(TransformGizmoInteraction::RotateAxis {
                     original,
                     axis: rotation.mul_vec3(original),
                 })
             }
             TransformGizmoInteraction::ScaleAxis { original, axis: _ } => {
+                if let Some(filter) = axis_filter {
+                    if filter == original {
+                        visibility.is_visible = true;
+                    } else {
+                        visibility.is_visible = false;
+                    }
+                } else {
+                    visibility.is_visible = true;
+                }
                 Some(TransformGizmoInteraction::ScaleAxis {
                     original,
                     axis: rotation.mul_vec3(original),
                 })
             }
         } {
-            *interaction = rotated_interaction;
+            if let None = option {
+                *interaction = rotated_interaction;
+            }
         }
-    }
-
-    for mut visibility in rotations.iter_mut() {
-        visibility.is_visible = plugin_settings.allow_rotation;
     }
 }
 
