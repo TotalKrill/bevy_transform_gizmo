@@ -45,7 +45,8 @@ pub fn normalize(
     let (camera_position, camera) = if let Ok((camera_position, camera)) = query.p0().get_single() {
         (camera_position.to_owned(), camera.to_owned())
     } else {
-        error!("More than one picking camera");
+        let cams = query.p0().iter().len();
+        error!("Not exactly one picking camera: {}", cams);
         return;
     };
     let view = camera_position.compute_matrix().inverse();

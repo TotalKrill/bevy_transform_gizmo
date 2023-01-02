@@ -235,7 +235,7 @@ fn drag_gizmo(
     let picking_camera = if let Some(cam) = pick_cam.iter().last() {
         cam
     } else {
-        error!("Not exactly one picking camera.");
+        debug!("Not exactly one picking camera.");
         return;
     };
     let picking_ray = if let Some(ray) = picking_camera.get_ray() {
