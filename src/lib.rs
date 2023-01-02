@@ -386,24 +386,23 @@ fn hover_gizmo(
     hover_query: Query<&TransformGizmoInteraction>,
 ) {
     for (children, mut gizmo, mut interaction, _transform) in gizmo_query.iter_mut() {
-        if let Some((topmost_gizmo_entity, _)) = gizmo_raycast_source
-            .get_single()
-            .expect("Missing gizmo raycast source")
-            .get_nearest_intersection()
-        {
-            if *interaction == Interaction::None {
-                for child in children
-                    .iter()
-                    .filter(|entity| **entity == topmost_gizmo_entity)
-                {
-                    *interaction = Interaction::Hovered;
-                    if let Ok(gizmo_interaction) = hover_query.get(*child) {
-                        gizmo.current_interaction = Some(*gizmo_interaction);
+        if let Ok(gizmo_raycast_source) = gizmo_raycast_source.get_single() {
+            if let Some((topmost_gizmo_entity, _)) = gizmo_raycast_source.get_nearest_intersection()
+            {
+                if *interaction == Interaction::None {
+                    for child in children
+                        .iter()
+                        .filter(|entity| **entity == topmost_gizmo_entity)
+                    {
+                        *interaction = Interaction::Hovered;
+                        if let Ok(gizmo_interaction) = hover_query.get(*child) {
+                            gizmo.current_interaction = Some(*gizmo_interaction);
+                        }
                     }
                 }
+            } else if *interaction == Interaction::Hovered {
+                *interaction = Interaction::None
             }
-        } else if *interaction == Interaction::Hovered {
-            *interaction = Interaction::None
         }
     }
 }
